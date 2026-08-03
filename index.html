@@ -2,27 +2,35 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cadastro de Clientes</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f9; }
         form { background: white; padding: 20px; border-radius: 8px; max-width: 400px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         input { width: 100%; padding: 8px; margin: 8px 0 16px 0; box-sizing: border-box; }
-        button { background: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; }
-        button.export { background: #28a745; }
+        button { color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; }
+        .btn-salvar { background: #007bff; }
+        .btn-export { background: #28a745; }
         table { width: 100%; margin-top: 20px; border-collapse: collapse; background: white; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
         th { background: #007bff; color: white; }
+        .btn-edit { background: #ffc107; color: black; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 5px; }
+        .btn-del { background: #dc3545; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <h2>📝 Cadastro de Pessoas</h2>
     <form id="cadastroForm">
+    
+        <input type="hidden" id="editIndex">
+
         <label>Nome Completo:</label>
         <input type="text" id="nome" required>
 
-        <label>Data de Nascimento:</label>
-        <input type="date" id="dataNasc" required>
+        <label>Data de Nascimento (DD/MM/AAAA):</label>
+    
+        <input type="text" id="dataNasc" placeholder="Ex: 11/12/2006" maxlength="10" required>
 
         <label>Telefone:</label>
         <input type="tel" id="telefone" required>
@@ -33,11 +41,11 @@
         <label>CPF:</label>
         <input type="text" id="cpf" required>
 
-        <button type="submit">Salvar</button>
-        <button type="button" class="export" onclick="exportarCSV()">Baixar CSV</button>
+        <button type="submit" class="btn-salvar" id="btnAcao">Salvar</button>
+        <button type="button" class="btn-export" onclick="exportarCSV()">Baixar CSV</button>
     </form>
 
-    <h2>📋 Dados Salvos</h2>
+    <h2>📋 Dados Salvos (Ordem Alfabética)</h2>
     <table>
         <thead>
             <tr>
@@ -46,6 +54,7 @@
                 <th>Telefone</th>
                 <th>Endereço</th>
                 <th>CPF</th>
+                <th>Ações</th>
             </tr>
         </thead>
         <tbody id="tabelaDados"></tbody>
@@ -53,90 +62,123 @@
 
     <script>
         const form = document.getElementById('cadastroForm');
-const tabela = document.getElementById('tabelaDados');
+        const tabela = document.getElementById('tabelaDados');
+        const inputData = document.getElementById('dataNasc');
+        const inputEditIndex = document.getElementById('editIndex');
+        const btnAcao = document.getElementById('btnAcao');
 
-document.addEventListener('DOMContentLoaded', carregarDados);
+        document.addEventListener('DOMContentLoaded', carregarDados);
 
-form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const novoRegistro = {
-        nome: document.getElementById('nome').value,
-        dataNasc: document.getElementById('dataNasc').value,
-        telefone: document.getElementById('telefone').value,
-        endereco: document.getElementById('endereco').value,
-        cpf: document.getElementById('cpf').value
-    };
+        inputData.addEventListener('input', function(e) {
+            let v = e.target.value.replace(/\D/g, ""); // Remove tudo que não é número
+            if (v.length > 2) v = v.substring(0,2) + '/' + v.substring(2);
+            if (v.length > 5) v = v.substring(0,5) + '/' + v.substring(5,9);
+            e.target.value = v;
+        });
 
-    let lista = JSON.parse(localStorage.getItem('usuarios')) || [];
-    lista.push(novoRegistro);
-    localStorage.setItem('usuarios', JSON.stringify(lista));
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const registro = {
+                nome: document.getElementById('nome').value,
+                dataNasc: inputData.value,
+                telefone: document.getElementById('telefone').value,
+                endereco: document.getElementById('endereco').value,
+                cpf: document.getElementById('cpf').value
+            };
 
-    form.reset();
-    carregarDados();
-});
+            let lista = JSON.parse(localStorage.getItem('usuarios')) || [];
+            const indexOriginal = inputEditIndex.value;
 
-function carregarDados() {
-    tabela.innerHTML = '';
-    let lista = JSON.parse(localStorage.getItem('usuarios')) || [];
-    
-    // 🔥 ESSA LINHA COLOCA A LISTA EM ORDEM ALFABÉTICA PELO NOME
-    lista.sort((a, b) => a.nome.localeCompare(b.nome));
+            if (indexOriginal !== "") {
+                const nomeAntigo = inputEditIndex.getAttribute('data-nome-antigo');
+                const idxReal = lista.findIndex(item => item.nome === nomeAntigo);
+                
+                if (idxReal !== -1) {
+                    lista[idxReal] = registro;
+                }
+                inputEditIndex.value = "";
+                inputEditIndex.removeAttribute('data-nome-antigo');
+                btnAcao.textContent = "Salvar";
+            } else {
+                lista.push(registro);
+            }
 
-    lista.forEach((item, index) => {
-        let dataFormatada = "";
-        if (item.dataNasc) {
-            const partes = item.dataNasc.split('-');
-            dataFormatada = `${partes[2]}/${partes[1]}/${partes[0]}`; 
+            localStorage.setItem('usuarios', JSON.stringify(lista));
+            form.reset();
+            carregarDados();
+        });
+
+        function carregarDados() {
+            tabela.innerHTML = '';
+            let lista = JSON.parse(localStorage.getItem('usuarios')) || [];
+            
+            lista.sort((a, b) => a.nome.localeCompare(b.nome));
+            
+            lista.forEach((item, index) => {
+                let linha = `<tr>
+                    <td>${item.nome}</td>
+                    <td>${item.dataNasc}</td>
+                    <td>${item.telefone}</td>
+                    <td>${item.endereco}</td>
+                    <td>${item.cpf}</td>
+                    <td>
+                        <button type="button" class="btn-edit" onclick="prepararEdicao('${item.nome}')">Editar</button>
+                        <button type="button" class="btn-del" onclick="deletarRegistro('${item.nome}')">Excluir</button>
+                    </td>
+                </tr>`;
+                tabela.innerHTML += linha;
+            });
         }
 
-        let linha = `<tr>
-            <td>${item.nome}</td>
-            <td>${dataFormatada}</td>
-            <td>${item.telefone}</td>
-            <td>${item.endereco}</td>
-            <td>${item.cpf}</td>
-            <td>
-                <button onclick="deletarRegistro(${index})" style="background: #dc3545; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer;">
-                    Excluir
-                </button>
-            </td>
-        </tr>`;
-        tabela.innerHTML += linha;
-    });
-}
+        function prepararEdicao(nomeItem) {
+            let lista = JSON.parse(localStorage.getItem('usuarios')) || [];
+            const item = lista.find(u => u.nome === nomeItem);
+            
+            if (item) {
+                document.getElementById('nome').value = item.nome;
+                inputData.value = item.dataNasc;
+                document.getElementById('telefone').value = item.telefone;
+                document.getElementById('endereco').value = item.endereco;
+                document.getElementById('cpf').value = item.cpf;
+                
+                inputEditIndex.value = "editando";
+                inputEditIndex.setAttribute('data-nome-antigo', item.nome);
+                btnAcao.textContent = "Atualizar Cadastro";
+                window.scrollTo(0, 0); 
+            }
+        }
 
-function deletarRegistro(index) {
-    if (confirm("Tem certeza que deseja excluir este cadastro?")) {
-        let lista = JSON.parse(localStorage.getItem('usuarios')) || [];
-        
-        lista.splice(index, 1); 
-        
-        localStorage.setItem('usuarios', JSON.stringify(lista));
-        
-        carregarDados();
-    }
-}
+        function deletarRegistro(nomeItem) {
+            if (confirm(`Tem certeza que deseja excluir o cadastro de "${nomeItem}"?`)) {
+                let lista = JSON.parse(localStorage.getItem('usuarios')) || [];
+                lista = lista.filter(item => item.nome !== nomeItem);
+                localStorage.setItem('usuarios', JSON.stringify(lista));
+                carregarDados();
+            }
+        }
 
-function exportarCSV() {
-    let lista = JSON.parse(localStorage.getItem('usuarios')) || [];
-    if(lista.length === 0) return alert('Nenhum dado para exportar!');
+        function exportarCSV() {
+            let lista = JSON.parse(localStorage.getItem('usuarios')) || [];
+            if(lista.length === 0) return alert('Nenhum dado para exportar!');
 
-    let csvContent = "\uFEFF"; 
-    csvContent += "Nome completo,Data de nascimento,Telefone,Endereço,CPF\n";
+            let csvContent = "\uFEFF"; 
+            csvContent += "Nome completo,Data de nascimento,Telefone,Endereço,CPF\n";
 
-    lista.forEach(item => {
-        csvContent += `"${item.nome}","${item.dataNasc}","${item.telefone}","${item.endereco}","${item.cpf}"\n`;
-    });
+            lista.sort((a, b) => a.nome.localeCompare(b.nome));
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", "dados_cadastrados.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
+            lista.forEach(item => {
+                csvContent += `"${item.nome}","${item.dataNasc}","${item.telefone}","${item.endereco}","${item.cpf}"\n`;
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", "dados_cadastrados.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     </script>
 </body>
 </html>
